@@ -201,21 +201,21 @@ Deno.serve(async (req: Request) => {
 
   log('Received interaction:', { type: body.type });
 
-  // Handle PING - Discord endpoint verification
-  if (body.type === 1) {
-    log('PING received, sending PONG');
-    return new Response(JSON.stringify({ type: 1 }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  // Verify Discord signature for all non-PING requests
+  // Verify Discord signature for ALL requests (including PING)
   const isValid = verifyDiscordRequest(req, rawBody);
   if (!isValid) {
     log('Signature verification failed');
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Handle PING - Discord endpoint verification
+  if (body.type === 1) {
+    log('PING received, sending PONG');
+    return new Response(JSON.stringify({ type: 1 }), {
+      status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
   }
