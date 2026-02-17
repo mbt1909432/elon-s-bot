@@ -55,18 +55,13 @@ export interface SubagentRecord {
 }
 
 // Context for spawn execution
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseClientLike = any; // Use any to avoid complex type matching issues
+
 export interface SpawnContext {
   userId: string;
   conversationId?: string;
-  supabase: {
-    from: (table: string) => {
-      insert: (data: unknown) => {
-        select: () => {
-          single: () => Promise<{ data: SubagentRecord | null; error: unknown }>;
-        };
-      };
-    };
-  };
+  supabase: SupabaseClientLike;
   triggerSubagentExecution: (subagentId: string) => Promise<void>;
 }
 

@@ -173,9 +173,9 @@ export class TelegramChannel extends BaseChannel {
     return {
       id: callback.id,
       channel: 'telegram',
-      senderId: this.buildSenderId(user),
-      senderName: [user.first_name, user.last_name].filter(Boolean).join(' '),
-      senderUsername: user.username,
+      senderId: user ? this.buildSenderId(user) : 'unknown',
+      senderName: user ? [user.first_name, user.last_name].filter(Boolean).join(' ') : 'Unknown',
+      senderUsername: user?.username,
       chatId: String(message?.chat.id || ''),
       chatType: message?.chat ? this.mapChatType(message.chat.type) : 'private',
       content: callback.data || '',
@@ -183,8 +183,8 @@ export class TelegramChannel extends BaseChannel {
         type: 'callback_query',
         callbackId: callback.id,
         queryData: callback.data,
-        userId: user.id,
-        username: user.username,
+        userId: user?.id,
+        username: user?.username,
       },
       timestamp: new Date(),
       raw: body,
@@ -391,7 +391,8 @@ export class TelegramChannel extends BaseChannel {
   /**
    * Build sender ID with optional username for allowlist matching
    */
-  private buildSenderId(user: NonNullable<TelegramUpdate['message']>['from']): string {
+  private buildSenderId(user: NonNullable<TelegramUpdate['message']>['from'] | undefined): string {
+    if (!user) return 'unknown';
     const id = String(user.id);
     return user.username ? `${id}|${user.username}` : id;
   }

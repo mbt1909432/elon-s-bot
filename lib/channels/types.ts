@@ -107,6 +107,7 @@ export type TelegramUpdate = {
       username?: string;
     };
     date: number;
+    edit_date?: number;
     text?: string;
     caption?: string;
     photo?: Array<{ file_id: string; file_unique_id: string; width: number; height: number; file_size?: number }>;
@@ -155,6 +156,16 @@ export type TelegramUpdate = {
   };
 };
 
+export type DiscordUser = {
+  id: string;
+  username: string;
+  discriminator: string;
+  avatar?: string;
+  bot?: boolean;
+  system?: boolean;
+  public_flags?: number;
+};
+
 export type DiscordInteraction = {
   id: string;
   application_id: string;
@@ -173,15 +184,7 @@ export type DiscordInteraction = {
   guild_id?: string;
   channel_id?: string;
   member?: {
-    user: {
-      id: string;
-      username: string;
-      discriminator: string;
-      avatar?: string;
-      bot?: boolean;
-      system?: boolean;
-      public_flags?: number;
-    };
+    user: DiscordUser;
     nick?: string;
     roles: string[];
     joined_at: string;
@@ -189,7 +192,7 @@ export type DiscordInteraction = {
     pending?: boolean;
     permissions: string;
   };
-  user?: DiscordInteraction['member']['user'];
+  user?: DiscordUser;
   token: string;
   version: number;
   message?: {
@@ -197,7 +200,7 @@ export type DiscordInteraction = {
     channel_id: string;
     guild_id?: string;
     content: string;
-    author: DiscordInteraction['member']['user'];
+    author: DiscordUser;
   };
 };
 
@@ -227,6 +230,7 @@ export type FeishuEvent = {
       parent_id?: string;
       create_time: string;
       chat_id: string;
+      chat_type?: string;
       message_type: string;
       content: string;
       mentions?: Array<{
@@ -262,7 +266,7 @@ export const InboundMessageSchema = z.object({
     caption: z.string().optional(),
   })).optional(),
   replyTo: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   timestamp: z.date().or(z.string().transform(v => new Date(v))),
   raw: z.unknown().optional(),
 });
@@ -280,6 +284,6 @@ export const OutboundMessageSchema = z.object({
     size: z.number().optional(),
     caption: z.string().optional(),
   })).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   parseMode: z.enum(['markdown', 'html', 'plain']).optional(),
 });

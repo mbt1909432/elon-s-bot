@@ -11,7 +11,13 @@
       "Bash(git init:*)",
       "Bash(git branch:*)",
       "Bash(git remote add origin:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git rm:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(echo \"请按以下步骤操作：\n\n1. 打开 https://vercel.com\n2. 点击 ''Add New...'' -> ''Project''\n3. 导入 GitHub 仓库: mbt1909432/elon-s-bot\n4. 配置环境变量:\n   - NEXT_PUBLIC_SUPABASE_URL=你的Supabase项目URL\n   - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=你的Supabase anon key\n   \n5. 点击 Deploy\n\nVercel 会自动检测 Next.js 项目并部署。\")",
+      "Bash(npx supabase login:*)",
+      "Bash(npx supabase:*)"
     ]
   }
 }

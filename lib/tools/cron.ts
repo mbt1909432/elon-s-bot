@@ -76,19 +76,14 @@ export interface CronJobRecord {
 }
 
 // Context for cron execution
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseClientLike = any; // Use any to avoid complex type matching issues
+
 export interface CronContext {
   userId: string;
   conversationId?: string;
   channelId?: string;
-  supabase: {
-    from: (table: string) => {
-      insert: (data: unknown) => {
-        select: () => {
-          single: () => Promise<{ data: CronJobRecord | null; error: unknown }>;
-        };
-      };
-    };
-  };
+  supabase: SupabaseClientLike;
 }
 
 /**

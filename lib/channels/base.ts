@@ -49,19 +49,19 @@ export abstract class BaseChannel {
   abstract formatContent(content: string, parseMode?: 'markdown' | 'html' | 'plain'): string;
 
   /**
-   * Get platform-specific file URL from file ID
+   * Get platform-specific file URL from file ID (optional)
    */
-  abstract getFileUrl?(fileId: string): Promise<string>;
+  getFileUrl?(fileId: string): Promise<string>;
 
   /**
-   * Download media file from platform
+   * Download media file from platform (optional)
    */
-  abstract downloadMedia?(fileId: string): Promise<Blob>;
+  downloadMedia?(fileId: string): Promise<Blob>;
 
   /**
-   * Send typing indicator
+   * Send typing indicator (optional)
    */
-  abstract sendTypingIndicator?(chatId: string): Promise<void>;
+  sendTypingIndicator?(chatId: string): Promise<void>;
 
   /**
    * Health check for the channel connection

@@ -150,7 +150,7 @@ export function mcpToolToOpenAISchema(
     function: {
       name: `mcp_${serverName}_${tool.name}`,
       description: tool.description || tool.name,
-      parameters: tool.inputSchema,
+      parameters: tool.inputSchema as ToolDefinition['function']['parameters'],
     },
   };
 }

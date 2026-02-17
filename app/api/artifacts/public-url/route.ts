@@ -5,6 +5,9 @@ import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAcontextClient } from '@/lib/acontext/client';
 
+// Mark as dynamic to prevent prerendering
+export const dynamic = 'force-dynamic';
+
 // ============================================
 // GET - Get public URL for a disk artifact
 // ============================================

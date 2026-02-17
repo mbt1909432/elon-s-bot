@@ -50,7 +50,7 @@ export class FeishuChannel extends BaseChannel {
     this.appSecret = options.config.feishuAppSecret || '';
     this.encryptKey = options.config.feishuEncryptKey;
     this.verificationToken = options.config.feishuVerificationToken;
-    this.useLark = options.config.customSettings?.useLark ?? false;
+    this.useLark = Boolean(options.config.customSettings?.useLark);
   }
 
   /**

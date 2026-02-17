@@ -126,7 +126,11 @@ export class DiscordChannel extends BaseChannel {
       content = optionStr || commandName;
     } else if (body.type === 3) {
       // MESSAGE_COMPONENT (button/select menu)
-      content = body.data?.resolved?.messages?.[Object.keys(body.data.resolved.messages)[0]]?.content || '';
+      const messages = body.data?.resolved?.messages as Record<string, { content?: string }> | undefined;
+      if (messages) {
+        const firstKey = Object.keys(messages)[0];
+        content = messages[firstKey]?.content || '';
+      }
       commandName = body.data?.name || 'component';
     } else if (body.type === 4) {
       // AUTOCOMPLETE

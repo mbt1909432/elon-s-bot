@@ -40,6 +40,9 @@ export type EditStrategy =
 // Tool Execution Context
 // ============================================
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseClientLike = any; // Use any to avoid complex type matching issues
+
 export interface ToolExecutionContext {
   acontextClient: import('@/lib/acontext/client').AcontextClient;
   diskId?: string;
@@ -47,15 +50,7 @@ export interface ToolExecutionContext {
   userId?: string;
   conversationId?: string;
   skillIds?: string[]; // Mounted skill IDs for SKILL_TOOLS
-  supabase: {
-    from: (table: string) => {
-      insert: (data: unknown) => {
-        select: () => {
-          single: () => Promise<{ data: unknown; error: unknown }>;
-        };
-      };
-    };
-  };
+  supabase: SupabaseClientLike;
 }
 
 // ============================================
