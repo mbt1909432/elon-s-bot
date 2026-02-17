@@ -130,27 +130,10 @@ async function getOrCreateChannelConversation(
   const acontextClient = getAcontextClient();
 
   try {
-    // Create session
-    const sessionResponse = await acontextClient.POST('/sessions', {
-      body: {
-        label: `Channel: ${platform} - ${platformUserName}`,
-      },
-    });
-
-    if (sessionResponse.error || !sessionResponse.data) {
-      throw new Error('Failed to create Acontext session');
-    }
-
-    const sessionId = sessionResponse.data.session_id;
-
-    // Create disk
-    const diskResponse = await acontextClient.POST('/disks', {
-      body: {
-        label: `Channel Disk: ${platform} - ${platformChatId}`,
-      },
-    });
-
-    const diskId = diskResponse.data?.disk_id || null;
+    // Create session with disk using the proper method
+    const { sessionId, diskId } = await acontextClient.createSessionWithDisk(
+      `channel:${platform}:${platformUserId}`
+    );
 
     // Update conversation with Acontext IDs
     await supabase
@@ -166,7 +149,7 @@ async function getOrCreateChannelConversation(
     return {
       conversationId: newConv.id,
       sessionId,
-      diskId: diskId || '',
+      diskId,
     };
   } catch (error) {
     console.error('Error creating Acontext resources:', error);
