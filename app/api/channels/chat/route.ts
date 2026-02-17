@@ -36,8 +36,11 @@ function getSupabaseAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Missing Supabase environment variables');
+  if (!supabaseUrl) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
+  }
+  if (!serviceRoleKey) {
+    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
   }
 
   return createClient(supabaseUrl, serviceRoleKey, {
@@ -69,6 +72,7 @@ async function getOrCreateChannelUser(
   const { data: existingUsers, error: searchError } = await supabase.auth.admin.listUsers();
 
   if (searchError) {
+    console.error('Error listing users:', searchError);
     throw new Error(`Failed to search users: ${searchError.message}`);
   }
 
@@ -79,6 +83,7 @@ async function getOrCreateChannelUser(
   );
 
   if (existingUser) {
+    console.log('Found existing channel user:', existingUser.id);
     return {
       userId: existingUser.id,
       userEmail: existingUser.email || '',
@@ -87,6 +92,8 @@ async function getOrCreateChannelUser(
 
   // Create new virtual user
   const virtualEmail = `${platform}_${platformUserId}@channels.elonsbot.local`;
+  console.log('Creating new channel user with email:', virtualEmail);
+
   const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
     email: virtualEmail,
     email_confirm: true,
@@ -98,9 +105,16 @@ async function getOrCreateChannelUser(
     },
   });
 
-  if (createError || !newUser.user) {
-    throw new Error(`Failed to create channel user: ${createError?.message}`);
+  if (createError) {
+    console.error('Error creating user:', createError);
+    throw new Error(`Failed to create channel user: ${createError.message}`);
   }
+
+  if (!newUser.user) {
+    throw new Error('Failed to create channel user: No user returned');
+  }
+
+  console.log('Created new channel user:', newUser.user.id);
 
   return {
     userId: newUser.user.id,
