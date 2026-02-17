@@ -4,16 +4,7 @@
  * Should be called by a scheduler (e.g., pg_cron, external cron service)
  */
 
-import { corsHeaders, errorResponse, jsonResponse, log } from '../_shared/channel-utils.ts';
-
-// Environment variables
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-// LLM config
-const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://openrouter.ai/api/v1';
-const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || Deno.env.get('OPENROUTER_API_KEY') || '';
-const LLM_MODEL = Deno.env.get('LLM_MODEL') || 'anthropic/claude-sonnet-4';
+import { corsHeaders, errorResponse, jsonResponse, log, SUPABASE_URL, SUPABASE_SERVICE_KEY, LLM_ENDPOINT, LLM_API_KEY, LLM_MODEL } from '../_shared/channel-utils.ts';
 
 /**
  * Get due cron jobs

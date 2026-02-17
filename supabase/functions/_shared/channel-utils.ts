@@ -7,6 +7,11 @@ export const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 export const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 export const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+// LLM configuration (matching local .env.local naming)
+export const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://api.openai-next.com/v1';
+export const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || Deno.env.get('OPENROUTER_API_KEY') || '';
+export const LLM_MODEL = Deno.env.get('LLM_MODEL') || 'gpt-5.1';
+
 // CORS headers for all responses
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
