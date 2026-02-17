@@ -2,6 +2,7 @@
 // Uses API key authentication instead of Supabase auth
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import {
   createLLMClient,
   getLLMModel,
@@ -25,22 +26,41 @@ import {
   createSkillContext,
   getDefaultSkillIds,
 } from '@/lib/acontext/skill-tools';
-import { createClient } from '@/lib/supabase/server';
-import type { ChatMessage, ToolExecutionContext } from '@/lib/types/acontext';
+import type { ToolExecutionContext } from '@/lib/types/acontext';
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
+// Create Supabase admin client for channel operations
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
 
 // API Key validation
 function validateApiKey(apiKey: string | null): boolean {
   const validKey = process.env.CHANNEL_API_KEY;
   if (!validKey) {
-    console.warn('CHANNEL_API_KEY not configured');
-    return true; // Allow if not configured (for development)
+    console.warn('CHANNEL_API_KEY not configured - allowing all requests');
+    return true;
   }
   return apiKey === validKey;
 }
 
 // Get or create a virtual user for channel platforms
 async function getOrCreateChannelUser(
-  supabase: ReturnType<typeof createClient> extends Promise<infer T> ? T : never,
+  supabase: ReturnType<typeof getSupabaseAdmin>,
   platform: string,
   platformUserId: string,
   platformUserName?: string
@@ -90,7 +110,7 @@ async function getOrCreateChannelUser(
 
 // Get or create conversation for channel
 async function getOrCreateChannelConversation(
-  supabase: ReturnType<typeof createClient> extends Promise<infer T> ? T : never,
+  supabase: ReturnType<typeof getSupabaseAdmin>,
   userId: string,
   userEmail: string,
   platform: string,
@@ -99,8 +119,8 @@ async function getOrCreateChannelConversation(
   id: string;
   sessionId: string;
   diskId: string;
-  systemPrompt?: string | null;
-  title?: string | null;
+  systemPrompt?: string;
+  title?: string;
 }> {
   // Check if conversation exists for this channel
   const { data: existingConv } = await supabase
@@ -121,8 +141,7 @@ async function getOrCreateChannelConversation(
   }
 
   // Create new conversation using existing logic
-  const { getOrCreateConversation: createConv } = await import('@/lib/chat-session');
-  const conversation = await createConv(userId, userEmail);
+  const conversation = await getOrCreateConversation(userId, userEmail);
 
   // Update with channel metadata
   await supabase
@@ -146,6 +165,7 @@ export async function POST(request: NextRequest) {
     // Validate API key
     const apiKey = request.headers.get('X-Channel-API-Key');
     if (!validateApiKey(apiKey)) {
+      console.log(`[${requestId}] Error: Invalid API key`);
       return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
     }
 
@@ -161,14 +181,15 @@ export async function POST(request: NextRequest) {
     });
 
     if (!message || !platform || !platformUserId || !platformChatId) {
+      console.log(`[${requestId}] Error: Missing required fields`);
       return NextResponse.json(
         { error: 'Missing required fields: platform, platformUserId, platformChatId, message' },
         { status: 400 }
       );
     }
 
-    // Get Supabase admin client (for channel user management)
-    const supabase = await createClient();
+    // Get Supabase admin client
+    const supabase = getSupabaseAdmin();
 
     // Get or create virtual user for this channel user
     const { userId, userEmail } = await getOrCreateChannelUser(
@@ -223,6 +244,8 @@ export async function POST(request: NextRequest) {
     const llm = createLLMClient();
     const model = getLLMModel();
     const tools = getAllToolSchemas();
+
+    console.log(`[${requestId}] Calling LLM: ${model}`);
 
     const stream = await llm.chat.completions.create({
       model,
@@ -289,7 +312,7 @@ export async function POST(request: NextRequest) {
         userId,
         conversationId: conversation.id,
         skillIds: skillContext?.mountedSkillIds || [],
-        supabase,
+        supabase: supabase as any,
       };
 
       // Execute tools and collect results
@@ -365,7 +388,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`[${requestId}] Response:`, fullContent.substring(0, 100));
+    console.log(`[${requestId}] Response length: ${fullContent.length}`);
 
     return NextResponse.json({
       success: true,

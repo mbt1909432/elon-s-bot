@@ -210,6 +210,16 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  // Verify Discord signature for all non-PING requests
+  const isValid = verifyDiscordRequest(req, rawBody);
+  if (!isValid) {
+    log('Signature verification failed');
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   // Handle APPLICATION_COMMAND (slash command)
   if (body.type === 2) {
     const data = body.data as Record<string, unknown>;
