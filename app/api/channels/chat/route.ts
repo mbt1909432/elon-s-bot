@@ -154,7 +154,13 @@ async function getOrCreateChannelConversation(
     })
     .eq('id', conversation.id);
 
-  return conversation;
+  return {
+    id: conversation.id,
+    sessionId: conversation.sessionId,
+    diskId: conversation.diskId,
+    systemPrompt: conversation.systemPrompt ?? undefined,
+    title: conversation.title ?? undefined,
+  };
 }
 
 export async function POST(request: NextRequest) {
