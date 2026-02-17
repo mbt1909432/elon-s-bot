@@ -1,5 +1,5 @@
 // Channel Chat API - For Discord/Telegram/Feishu integrations
-// Uses existing user management with metadata to track channel users
+// Simplified: Uses the main user's account with separate conversations per channel
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -40,18 +40,29 @@ function validateApiKey(apiKey: string | null): boolean {
   return apiKey === validKey;
 }
 
-// Create Supabase admin client
-function getSupabaseAdmin() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Get the main channel service user ID from database
+async function getChannelServiceUser(supabase: ReturnType<typeof createClient>): Promise<string> {
+  // Try to find an existing user to use for channel operations
+  const { data: existingUser } = await supabase
+    .from('profiles')
+    .select('id')
+    .limit(1)
+    .single();
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Missing Supabase environment variables');
+  if (existingUser) {
+    console.log('Using existing user for channel operations:', existingUser.id);
+    return existingUser.id;
   }
 
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  // If no user exists, get the first user from auth
+  const { data: { users } } = await supabase.auth.admin.listUsers();
+
+  if (users && users.length > 0) {
+    console.log('Using first auth user for channel operations:', users[0].id);
+    return users[0].id;
+  }
+
+  throw new Error('No users found in database. Please create a user first by logging into the web app.');
 }
 
 export async function POST(request: NextRequest) {
@@ -84,78 +95,68 @@ export async function POST(request: NextRequest) {
     }
 
     // Get Supabase admin client
-    const supabase = getSupabaseAdmin();
-
-    // Create virtual email for this channel user
-    const virtualEmail = `${platform}_${platformUserId}@channels.elonsbot.local`;
-
-    // Check if user already exists
-    const { data: existingUsers } = await supabase.auth.admin.listUsers();
-    let userId: string;
-
-    const existingUser = existingUsers?.users?.find(
-      u => u.user_metadata?.platform_user_id === platformUserId &&
-           u.user_metadata?.platform === platform
-    );
-
-    if (existingUser) {
-      userId = existingUser.id;
-      console.log(`[${requestId}] Found existing user:`, userId);
-    } else {
-      // Create new user for this channel
-      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-        email: virtualEmail,
-        email_confirm: true,
-        user_metadata: {
-          platform,
-          platform_user_id: platformUserId,
-          platform_user_name: platformUserName,
-          platform_chat_id: platformChatId,
-          is_channel_user: true,
-        },
-      });
-
-      if (createError) {
-        console.error('Error creating user:', createError);
-        throw new Error(`Failed to create user: ${createError.message}`);
-      }
-
-      if (!newUser?.user) {
-        throw new Error('Failed to create user: no user returned');
-      }
-
-      userId = newUser.user.id;
-      console.log(`[${requestId}] Created new user:`, userId);
-    }
-
-    // Use existing conversation management
-    // This handles Acontext session/disk creation properly
-    const conversation = await getOrCreateConversation(userId, virtualEmail);
-
-    console.log(`[${requestId}] Conversation:`, {
-      id: conversation.id,
-      sessionId: conversation.sessionId,
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Update conversation metadata with channel info
-    await supabase
+    // Get the service user (use existing user instead of creating new one)
+    const userId = await getChannelServiceUser(supabase);
+    const serviceEmail = 'channels@elonsbot.service';
+
+    // Create unique conversation key for this channel
+    const channelKey = `${platform}_${platformChatId}`;
+
+    // Check if conversation already exists for this channel
+    const { data: existingConv } = await supabase
       .from('conversations')
-      .update({
-        metadata: {
-          platform,
-          platform_user_id: platformUserId,
-          platform_user_name: platformUserName,
-          platform_chat_id: platformChatId,
-        },
-      })
-      .eq('id', conversation.id);
+      .select('*')
+      .eq('user_id', userId)
+      .eq('metadata->>channel_key', channelKey)
+      .single();
+
+    let conversationId: string;
+    let sessionId: string;
+    let diskId: string;
+
+    if (existingConv && existingConv.acontext_session_id) {
+      // Use existing conversation
+      conversationId = existingConv.id;
+      sessionId = existingConv.acontext_session_id;
+      diskId = existingConv.acontext_disk_id || '';
+      console.log(`[${requestId}] Using existing conversation:`, conversationId);
+    } else {
+      // Create new conversation using existing flow
+      const conversation = await getOrCreateConversation(userId, serviceEmail);
+      conversationId = conversation.id;
+      sessionId = conversation.sessionId;
+      diskId = conversation.diskId;
+
+      // Update with channel metadata
+      await supabase
+        .from('conversations')
+        .update({
+          title: `${platform} - ${platformUserName || 'Unknown'}`,
+          metadata: {
+            channel_key: channelKey,
+            platform,
+            platform_user_id: platformUserId,
+            platform_user_name: platformUserName,
+            platform_chat_id: platformChatId,
+          },
+        })
+        .eq('id', conversationId);
+
+      console.log(`[${requestId}] Created new conversation:`, conversationId);
+    }
 
     // Load history from Acontext
-    const history = await loadChatHistory(conversation.sessionId);
+    const history = await loadChatHistory(sessionId);
     console.log(`[${requestId}] History loaded: ${history.length} messages`);
 
     // Store user message
-    await storeUserMessage(conversation.sessionId, message);
+    await storeUserMessage(sessionId, message);
 
     // Build messages for LLM
     const defaultSkillIds = getDefaultSkillIds();
@@ -163,8 +164,8 @@ export async function POST(request: NextRequest) {
       ? await createSkillContext(defaultSkillIds)
       : null;
 
-    let systemPrompt = conversation.systemPrompt || getDefaultSystemPrompt();
-    systemPrompt = `${systemPrompt}\n\nYou are responding to a user on ${platform}. Their username is ${platformUserName}.`;
+    let systemPrompt = getDefaultSystemPrompt();
+    systemPrompt = `${systemPrompt}\n\nYou are responding to a user named ${platformUserName || 'Unknown'} on ${platform}.`;
     if (skillContext?.skillsContext) {
       systemPrompt = `${systemPrompt}\n\n---\n\n# Available Skills\n\n${skillContext.skillsContext}`;
     }
@@ -232,15 +233,15 @@ export async function POST(request: NextRequest) {
     if (toolCalls.length > 0) {
       console.log(`[${requestId}] Executing tools:`, toolCalls.map(tc => tc.function.name));
 
-      await storeAssistantMessage(conversation.sessionId, fullContent, toolCalls);
+      await storeAssistantMessage(sessionId, fullContent, toolCalls);
 
       const acontextClient = getAcontextClient();
       const toolContext: ToolExecutionContext = {
         acontextClient,
-        diskId: conversation.diskId,
-        sessionId: conversation.sessionId,
+        diskId,
+        sessionId,
         userId,
-        conversationId: conversation.id,
+        conversationId,
         skillIds: skillContext?.mountedSkillIds || [],
         supabase: supabase as any,
       };
@@ -253,7 +254,7 @@ export async function POST(request: NextRequest) {
         const executionTime = Date.now() - startTime;
 
         logToolExecution(
-          conversation.id,
+          conversationId,
           toolCall.function.name,
           JSON.parse(toolCall.function.arguments || '{}'),
           result.output,
@@ -263,7 +264,7 @@ export async function POST(request: NextRequest) {
         );
 
         const toolResultContent = JSON.stringify(result.output || { error: result.error });
-        await storeToolMessage(conversation.sessionId, toolCall.id, toolResultContent);
+        await storeToolMessage(sessionId, toolCall.id, toolResultContent);
 
         toolResults.push({
           tool_call_id: toolCall.id,
@@ -297,21 +298,23 @@ export async function POST(request: NextRequest) {
       fullContent = finalContent;
 
       if (finalContent) {
-        await storeAssistantMessage(conversation.sessionId, finalContent);
+        await storeAssistantMessage(sessionId, finalContent);
       }
     } else {
-      await storeAssistantMessage(conversation.sessionId, fullContent);
+      await storeAssistantMessage(sessionId, fullContent);
     }
 
-    // Update conversation title
-    await updateConversationTitle(conversation.id, message.slice(0, 50));
+    // Update conversation title if new
+    if (!existingConv) {
+      await updateConversationTitle(conversationId, message.slice(0, 50));
+    }
 
     console.log(`[${requestId}] Response length: ${fullContent.length}`);
 
     return NextResponse.json({
       success: true,
       content: fullContent,
-      conversation_id: conversation.id,
+      conversation_id: conversationId,
     });
   } catch (error) {
     console.error(`[${requestId}] Error:`, error);
