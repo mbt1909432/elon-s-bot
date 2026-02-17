@@ -99,8 +99,8 @@ async function getOrCreateChannelConversation(
   id: string;
   sessionId: string;
   diskId: string;
-  systemPrompt?: string;
-  title?: string;
+  systemPrompt?: string | null;
+  title?: string | null;
 }> {
   // Check if conversation exists for this channel
   const { data: existingConv } = await supabase
@@ -115,8 +115,8 @@ async function getOrCreateChannelConversation(
       id: existingConv.id,
       sessionId: existingConv.acontext_session_id,
       diskId: existingConv.acontext_disk_id,
-      systemPrompt: existingConv.system_prompt,
-      title: existingConv.title,
+      systemPrompt: existingConv.system_prompt ?? undefined,
+      title: existingConv.title ?? undefined,
     };
   }
 
